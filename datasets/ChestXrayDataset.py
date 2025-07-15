@@ -1,6 +1,8 @@
 from PIL import Image
 import os
 from torch.utils.data import Dataset
+import torch
+import numpy as np
 
 
 class ChestXrayDataset(Dataset):
@@ -9,7 +11,14 @@ class ChestXrayDataset(Dataset):
         self.image_dir = image_dir
         self.transform = transform
         self.device = device
-        self.classes = {label: idx for idx, label in enumerate(df['Finding Labels'].unique())}
+        self.label_map = self._create_label_map()
+
+    def _create_label_map(self):
+        all_labels = set()
+        for labels in self.df['Finding Labels']:
+            all_labels.update(labels.split('|'))
+
+        return {label: idx for idx, label in enumerate(sorted(all_labels))}
 
     def __len__(self):
         return len(self.df)
@@ -22,5 +31,10 @@ class ChestXrayDataset(Dataset):
         if self.transform:
             image = self.transform(image).to(self.device)
 
-        label = self.classes[row['Finding Labels']]
-        return image, label
+        labels = row['Finding Labels'].split('|')
+        target = np.zeros(len(self.label_map), dtype=np.float32)
+
+        for label in labels:
+            if label in self.label_map:
+                target[self.label_map[label]] = 1.0
+        return image, torch.tensor(target, dtype=torch.float32).to(self.device)

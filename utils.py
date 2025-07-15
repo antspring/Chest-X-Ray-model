@@ -17,11 +17,11 @@ def load_chest_xray_dataset(csv_file):
     return train_df, test_df
 
 
-def get_dataloaders(train_df, test_df, image_dir, transform, device, batch_size=32):
-    train_dataset = ChestXrayDataset(train_df, image_dir, transform, device)
-    test_dataset = ChestXrayDataset(test_df, image_dir, transform, device)
+def get_dataloaders(train_df, test_df, image_dir, train_transform, test_transform, device, batch_size=32):
+    train_dataset = ChestXrayDataset(train_df, image_dir, train_transform, device)
+    test_dataset = ChestXrayDataset(test_df, image_dir, test_transform, device)
 
     train_loader = DataLoader(train_dataset, batch_size=batch_size, shuffle=True)
     test_loader = DataLoader(test_dataset, batch_size=batch_size, shuffle=False)
 
-    return train_loader, test_loader
+    return train_loader, test_loader, train_dataset
