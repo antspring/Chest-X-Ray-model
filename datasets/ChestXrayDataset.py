@@ -3,6 +3,7 @@ import os
 from torch.utils.data import Dataset
 import torch
 import numpy as np
+from collections import Counter
 
 
 class ChestXrayDataset(Dataset):
@@ -12,6 +13,14 @@ class ChestXrayDataset(Dataset):
         self.transform = transform
         self.device = device
         self.label_map = self._create_label_map()
+        self.label_counter = self._create_label_counter()
+
+    def _create_label_counter(self):
+        label_counter = Counter()
+        for labels in self.df['Finding Labels']:
+            for label in labels.split('|'):
+                label_counter[label] += 1
+        return label_counter
 
     def _create_label_map(self):
         all_labels = set()

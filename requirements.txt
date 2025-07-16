@@ -3,3 +3,6 @@ torch
 torchvision
 pandas
 tqdm
+scikit-learn
+seaborn
+matplotlib

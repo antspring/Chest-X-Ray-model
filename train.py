@@ -1,9 +1,10 @@
 import torch
 import os
 from torchvision.models import DenseNet121_Weights
-from utils import get_dataloaders, load_chest_xray_dataset
+from utils import get_dataloaders, load_chest_xray_dataset, plot_history
 from torchvision import transforms, models
 from tqdm import tqdm
+from sklearn.metrics import classification_report
 
 
 class Trainer:
@@ -12,8 +13,9 @@ class Trainer:
         self.train_loader = train_loader
         self.test_loader = test_loader
         self.config = config
+        self.device = device
 
-        self.criterion = torch.nn.BCEWithLogitsLoss()
+        self.criterion = torch.nn.BCEWithLogitsLoss(pos_weight=self._create_pos_weight())
         self.optimizer = torch.optim.Adam(model.classifier.parameters(), lr=1e-4)
 
         self.save_dir = config.get('save_dir', 'checkpoints')
@@ -21,12 +23,23 @@ class Trainer:
 
         self.best_acc = 0.0
 
+    def _create_pos_weight(self):
+        pos_weight = []
+        for label in self.train_loader.dataset.label_map.keys():
+            positives = self.train_loader.dataset.label_counter.get(label, 1)
+            negatives = len(self.train_loader.dataset) - positives
+            pos_weight.append(negatives / positives)
+
+        return torch.tensor(pos_weight).float().to(self.device)
+
     def train_epoch(self):
         self.model.train()
         total_loss = 0.0
         total_acc = 0.0
         correct = 0
         total = 0
+        all_labels = []
+        all_predictions = []
 
         progress_bar = tqdm(self.train_loader, desc='Training')
 
@@ -42,12 +55,23 @@ class Trainer:
             total += images.size(0)
             total_acc = (correct / total).item()
 
+            all_labels.append(labels.cpu())
+            outputs = torch.sigmoid(outputs)
+            all_predictions.append((outputs > 0.5).int().cpu())
+
             progress_bar.set_postfix(loss=loss.item(), accuracy=f"{total_acc * 100:.2f}%")
+
+        y_true = torch.cat(all_labels).detach().numpy()
+        y_pred = torch.cat(all_predictions).detach().numpy()
+
+        print(classification_report(y_true, y_pred, target_names=list(self.train_loader.dataset.label_map.keys()),
+                                    zero_division=0))
 
         return total_loss / len(self.train_loader), total_acc * 100
 
     def validate(self):
         self.model.eval()
+        total_loss = 0.0
         correct = 0
         total = 0
 
@@ -56,8 +80,10 @@ class Trainer:
         with torch.no_grad():
             for images, labels in progress_bar:
                 outputs = self.model(images)
+                loss = self.criterion(outputs, labels)
                 correct += self.loose_accuracy(outputs, labels) * images.size(0)
                 total += images.size(0)
+                total_loss += loss.item()
 
         accuracy = (correct / total).item()
 
@@ -65,7 +91,7 @@ class Trainer:
             self.best_acc = accuracy
             self.save_checkpoint('best_model.pth')
 
-        return accuracy * 100
+        return total_loss, accuracy * 100
 
     def save_checkpoint(self, filename):
         checkpoint_path = os.path.join(self.save_dir, filename)
@@ -83,6 +109,10 @@ class Trainer:
 
     def train(self):
         num_epochs = self.config.get('num_epochs', 10)
+        train_loss_list = []
+        train_acc_list = []
+        test_loss_list = []
+        test_acc_list = []
 
         for epoch in range(num_epochs):
             print(f'Epoch {epoch + 1}/{num_epochs}')
@@ -97,11 +127,23 @@ class Trainer:
                 for param in self.optimizer.param_groups:
                     param['lr'] = 1e-5
 
-            val_acc = self.validate()
-            print(f'Validation accuracy: {val_acc:.2f}%')
+            test_loss, test_acc = self.validate()
+            print(f'Validation accuracy: {test_acc:.2f}%')
 
             if (epoch + 1) % self.config.get('save_epochs', 1) == 0:
                 self.save_checkpoint(f'checkpoint_epoch_{epoch + 1}.pth')
+
+            train_loss_list.append(train_loss)
+            train_acc_list.append(train_acc)
+            test_loss_list.append(test_loss)
+            test_acc_list.append(test_acc)
+
+        return {
+            'train_loss': train_loss_list,
+            'train_acc': train_acc_list,
+            'test_loss': test_loss_list,
+            'test_acc': test_acc_list
+        }
 
 
 def main():
@@ -144,7 +186,9 @@ def main():
 
     trainer = Trainer(model, train_loader, test_loader, config, device)
 
-    trainer.train()
+    history = trainer.train()
+
+    plot_history(history)
 
 
 if __name__ == '__main__':

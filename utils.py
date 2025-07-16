@@ -1,6 +1,7 @@
 import pandas as pd
 from torch.utils.data import DataLoader
 from datasets.ChestXrayDataset import ChestXrayDataset
+import matplotlib.pyplot as plt
 
 
 def load_chest_xray_dataset(csv_file):
@@ -25,3 +26,24 @@ def get_dataloaders(train_df, test_df, image_dir, train_transform, test_transfor
     test_loader = DataLoader(test_dataset, batch_size=batch_size, shuffle=False)
 
     return train_loader, test_loader, train_dataset
+
+
+def plot_history(history):
+    plt.figure(figsize=(12, 5))
+
+    plt.subplot(1, 2, 1)
+    plt.plot(history['train_loss'], label='Train Loss')
+    plt.plot(history['test_loss'], label='Test Loss')
+    plt.xlabel('Epochs')
+    plt.ylabel('Loss')
+    plt.legend()
+
+    plt.subplot(1, 2, 2)
+    plt.plot(history['train_acc'], label='Train Accuracy')
+    plt.plot(history['test_acc'], label='Test Accuracy')
+    plt.xlabel('Epochs')
+    plt.ylabel('Accuracy (%)')
+    plt.legend()
+
+    plt.tight_layout()
+    plt.show()
