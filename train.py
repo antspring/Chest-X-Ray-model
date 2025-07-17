@@ -91,7 +91,7 @@ class Trainer:
             self.best_acc = accuracy
             self.save_checkpoint('best_model.pth')
 
-        return total_loss, accuracy * 100
+        return total_loss / len(self.test_loader), accuracy * 100
 
     def save_checkpoint(self, filename):
         checkpoint_path = os.path.join(self.save_dir, filename)
@@ -124,8 +124,8 @@ class Trainer:
                 for param in self.model.parameters():
                     param.requires_grad = True
 
-                for param in self.optimizer.param_groups:
-                    param['lr'] = 1e-5
+                # for param in self.optimizer.param_groups:
+                #     param['lr'] = 1e-5
 
             test_loss, test_acc = self.validate()
             print(f'Validation accuracy: {test_acc:.2f}%')

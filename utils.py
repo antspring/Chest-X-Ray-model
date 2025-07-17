@@ -47,3 +47,24 @@ def plot_history(history):
 
     plt.tight_layout()
     plt.show()
+
+
+def get_chest_xray_dataset():
+    train_df, _ = load_chest_xray_dataset("data/Data_Entry_2017.csv")
+
+    return ChestXrayDataset(train_df, 'data/images')
+
+def plot_grad_map(original_image, result):
+    fig, axes = plt.subplots(1, 2, figsize=(10, 5))
+
+    axes[0].imshow(original_image)
+    axes[0].axis('off')
+    axes[0].set_title('Original Image')
+
+    axes[1].imshow(result)
+    axes[1].axis('off')
+    axes[1].set_title('Grad-CAM Result')
+
+    plt.tight_layout()
+    plt.savefig('grad_cam_result.png')
+    plt.close()
